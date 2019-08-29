@@ -1,0 +1,19 @@
+# install
+conda create -n mongo
+conda activate mongo
+conda install -c anaconda mongodb
+conda install pyspark pymongo ipython blosc pyarrow
+conda install -c conda-forge uproot
+
+# start a server
+mongod --dbpath data --bind_ip 127.0.0.1
+
+# start a client, make users
+mongo
+> use admin
+> db.createUser({user:'coffea', pwd: 'password', roles:[{db:'coffeadb', role:'readWrite'}]})
+> db.auth('coffea', 'password')
+
+
+252M 163M 465M 173M = 1053M
+1.2G
