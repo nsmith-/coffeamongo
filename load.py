@@ -35,7 +35,7 @@ def load(db):
     }
 
     for dataset, files in inputs.items():
-        for chunkindex, chunk in enumerate(uproot.iterate(files, 'Events', entrysteps=50000, namedecode='ascii')):
+        for chunkindex, chunk in enumerate(uproot.iterate(files, 'Events', entrysteps=500000, namedecode='ascii')):
             for column, data in chunk.items():
                 if not isinstance(data, np.ndarray) or len(data.shape) != 1:
                     print("Skpping column %s in chunk %d of %s" % (column, chunkindex, dataset))
