@@ -35,41 +35,46 @@ def load(db):
     }
 
     for dataset, files in inputs.items():
-        chunkindex = 0
-        for chunkindex, chunk in enumerate(uproot.iterate(files, 'Events', entrysteps=200000, namedecode='ascii')):
+        for chunkindex, chunk in enumerate(uproot.iterate(files, 'Events', entrysteps=50000, namedecode='ascii')):
             for column, data in chunk.items():
                 if not isinstance(data, np.ndarray) or len(data.shape) != 1:
-                    continue
+                    print("Skpping column %s in chunk %d of %s" % (column, chunkindex, dataset))
+                data = db.test.insert_one(pack(data))
                 record = {
                     'dataset': dataset,
                     'chunkindex': chunkindex,
                     'columns': {
-                        column: pack(data),
+                        column: data.inserted_id,
                     }
                 }
                 db.test.insert_one(record)
 
 
+def test(db):
+    allcolumns = {'MetYCorrjesDown', 'neleLoose', 'AK4Puppijet1_dR08', 'AK4Puppijet1_dPhi08', 'AK8Puppijet0_msd', 'genVPt', 'AK4Puppijet2_deepcsvb', 'AK8Puppijet0_phi', 'AK8Puppijet1_tau32', 'MetXCorrjesUp', 'AK4Puppijet1_deepcsvb', 'MetYCorrjesUp', 'AK8Puppijet0_deepdoubleb', 'AK8Puppijet1_e4_v2_sdb1', 'vmuoLoose0_pt', 'AK8Puppijet0_pt_JESDown', 'AK4Puppijet1_deepcsvbb', 'AK4Puppijet0_dR08', 'nmuLoose', 'scale1fb', 'AK8Puppijet0_isHadronicV', 'AK4Puppijet3_dR08', 'MetXCorrjerDown', 'AK4Puppijet3_dPhi08', 'AK4Puppijet3_deepcsvb', 'MetXCorrjesDown', 'AK4Puppijet2_dPhi08', 'genVPhi', 'AK4Puppijet0_pt', 'AK4Puppijet3_deepcsvbb', 'runNum', 'MetYCorrjerUp', 'AK8Puppijet0_pt_JERUp', 'npu', 'AK8Puppijet0_pt', 'AK4Puppijet2_dR08', 'AK8Puppijet1_phi', 'AK4Puppijet0_deepcsvb', 'AK8Puppijet0_deepdoublec', 'AK4Puppijet0_deepcsvbb', 'AK4Puppijet2_pt', 'AK8Puppijet0_pt_JERDown', 'AK8Puppijet0_pt_JESUp', 'AK4Puppijet1_pt', 'vmuoLoose0_phi', 'AK8Puppijet0_isTightVJet', 'pfmet', 'MetXCorrjerUp', 'ntau', 'pfmetphi', 'AK8Puppijet1_e3_v1_sdb1', 'genVMass', 'AK8Puppijet0_eta', 'AK8Puppijet1_msd', 'AK4Puppijet0_dPhi08', 'AK8Puppijet0_N2sdb1', 'MetYCorrjerDown', 'AK4Puppijet3_pt', 'AK4Puppijet2_deepcsvbb', 'vmuoLoose0_eta', 'nAK4PuppijetsPt30', 'AK8Puppijet0_deepdoublecvb'}
+    pipeline = [
+        {'$match': {'$or': [
+            {'columns.%s' % column: {'$exists': True}} for column in allcolumns
+        ]}},
+        {'$group': {'_id': {'dataset': '$dataset', 'chunkindex': '$chunkindex'}, 'columns': { '$mergeObjects': '$columns' }}},
+    ]
+    print(pipeline)
+    cur = db.test.aggregate(pipeline)
+
+    for chunk in cur:
+        print(chunk['_id'])
+        columns = chunk['columns']
+        for col in columns.keys():
+            data = db.test.find_one(columns[col])
+            columns[col] = unpack(data)
+
+        # do the stuff
+        print(columns)
+
+
+
 client = MongoClient('localhost:27017')
 db = client.coffeadb
 
-# load(db)
-
-# {'$match': {'columns': {'col1': {'$exists': True}}}},
-pipeline = [
-    {'$match': {'$or': [
-        {'columns.nphoLoose': {'$exists': True}},
-        {'columns.derived': {'$exists': True}},
-    ]}},
-    {'$group': {'_id': {'dataset': '$dataset', 'chunkindex': '$chunkindex'}, 'columns': { '$mergeObjects': '$columns' }}},
-]
-cur = db.test.aggregate(pipeline)
-
-for chunk in cur:
-    print(chunk['_id'])
-    columns = chunk['columns']
-    for col in columns.keys():
-        columns[col] = unpack(columns[col])
-
-    # do the stuff
-    print(columns)
+load(db)
+test(db)
