@@ -1,0 +1,23 @@
+name: mongo
+channels:
+  - anaconda
+  - conda-forge
+dependencies:
+  - mongodb
+  - pymongo
+  - pyspark
+  - pyarrow
+  - ipython
+  - blosc
+  - numba
+  - uproot
+  - pandas
+  - matplotlib
+  - scipy
+  - tqdm
+  - cloudpickle
+  - jinja2
+  - lz4
+  - pip
+  - pip:
+      - coffea
