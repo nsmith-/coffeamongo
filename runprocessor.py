@@ -5,6 +5,7 @@ import pickle
 import blosc
 import time
 import numpy
+import pandas as pd
 from pyspark.sql import SparkSession
 from functools import partial
 from coffea import processor, util
@@ -22,33 +23,34 @@ def zipadd(a, b):
     return lz4f.compress(pickle.dumps(out), compression_level=1)
 
 
-def process_chunk(processor_instance, chunkid, columns):
-    columns = columns.asDict()
+def process_chunk_pivot(processor_instance, chunkid, chunk):
+    dataset, chunkindex = chunkid
+    columns = {}
     size = None
-    print(chunkid)
-    for col in columns.keys():
-        if columns[col] is None:
-            print("Column %r is none" % col)
-            continue
-        pass
-        # columns[col] = unpack(columns[col])
-        # if not (size is None or size == len(columns[col])):
-        #     raise RuntimeError("column size mismatch")
+    for _, row in chunk.iterrows():
+        colname = row['column']
+        columns[colname] = unpack(row)
+        if not (size is None or size == len(columns[colname])):
+            raise RuntimeError("column size mismatch in chunk %r column %s" % (chunkid, colname))
+        elif size is None:
+            size = len(columns[colname])
 
-    # print(size)
-    # df = processor.PreloadedDataFrame(size=size, items=columns)
-    # df['dataset'] = chunkid['dataset']
-    # out = processor_instance.process(df)
-    out = "asdfasdf"
-    return lz4f.compress(pickle.dumps(out), compression_level=1)
+    df = processor.PreloadedDataFrame(size=size, items=columns)
+    df['dataset'] = dataset
+    out = processor_instance.process(df)
+    out = lz4f.compress(pickle.dumps(out), compression_level=1)
+    return pd.DataFrame([{'blob': out}])
 
 
 def execute(spark, processor_instance, pipeline):
-    spark_udf = fn.udf(partial(process_chunk, processor_instance), types.BinaryType())
+    blobrow = types.StructType([types.StructField("blob", types.BinaryType(), False)])
+    spark_udf = fn.pandas_udf(partial(process_chunk_pivot, processor_instance), blobrow, fn.PandasUDFType.GROUPED_MAP)
     db = spark.read.format("mongo")
     blob = (db
             .option("pipeline", pipeline).load()
-            .select(spark_udf('_id', 'columns').alias('blob'))
+            .select(['dataset', 'chunkindex', 'column', 'data.*'])
+            .groupby(['dataset', 'chunkindex'])
+            .apply(spark_udf)
             .rdd.map(lambda row: row['blob'])
             .treeReduce(zipadd, depth=2)
             )
@@ -56,15 +58,12 @@ def execute(spark, processor_instance, pipeline):
 
 
 def build_pipeline(columns):
-    pipeline = r"""[
-        {$match: {$or: [
-    """
+    pipeline = "[\n {$match: {$or: [\n"
     for col in columns:
-        pipeline += "{'columns.%s': {$exists: true}},\n" % col
+        pipeline += "            {'column': %r},\n" % col
     pipeline += """
             ]},
         },
-        {$group: {'_id': {'dataset': '$dataset', 'chunkindex': '$chunkindex'}, 'columns': {$mergeObjects: '$columns' }}},
     ]"""
     return pipeline
 
