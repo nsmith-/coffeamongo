@@ -10,6 +10,7 @@ dependencies:
   - psutil
   - ipython
   - blosc
+  - python-blosc
   - numba
   - uproot
   - pandas
