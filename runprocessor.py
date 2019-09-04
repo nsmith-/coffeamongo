@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import pyspark.sql.types as types
 import pyspark.sql.functions as fn
 import lz4.frame as lz4f
@@ -6,10 +7,11 @@ import blosc
 import time
 import numpy
 import pandas as pd
+import configparser
 from pyspark.sql import SparkSession
 from functools import partial
 from coffea import processor, util
-import configparser
+from urllib.parse import quote_plus
 
 
 def unpack(col):
@@ -86,13 +88,15 @@ spark = (SparkSession.builder
          .config('spark.sql.execution.arrow.maxRecordsPerBatch', 200000)
          .config("spark.jars.packages", "org.mongodb.spark:mongo-spark-connector_2.11:2.4.1")
          .config("spark.mongodb.input.uri", uri)
+         .config("spark.mongodb.input.partitioner", "MongoSplitVectorPartitioner")
          .config("spark.mongodb.output.uri", uri)
          .getOrCreate()
          )
 
 corrections = util.load('corrections.coffea')
-allcolumns = {'MetYCorrjesDown', 'neleLoose', 'AK4Puppijet1_dR08', 'AK4Puppijet1_dPhi08', 'AK8Puppijet0_msd', 'genVPt', 'AK4Puppijet2_deepcsvb', 'AK8Puppijet0_phi', 'AK8Puppijet1_tau32', 'MetXCorrjesUp', 'AK4Puppijet1_deepcsvb', 'MetYCorrjesUp', 'AK8Puppijet0_deepdoubleb', 'AK8Puppijet1_e4_v2_sdb1', 'vmuoLoose0_pt', 'AK8Puppijet0_pt_JESDown', 'AK4Puppijet1_deepcsvbb', 'AK4Puppijet0_dR08', 'nmuLoose', 'scale1fb', 'AK8Puppijet0_isHadronicV', 'AK4Puppijet3_dR08', 'MetXCorrjerDown', 'AK4Puppijet3_dPhi08', 'AK4Puppijet3_deepcsvb', 'MetXCorrjesDown', 'AK4Puppijet2_dPhi08', 'genVPhi', 'AK4Puppijet0_pt', 'AK4Puppijet3_deepcsvbb', 'runNum', 'MetYCorrjerUp', 'AK8Puppijet0_pt_JERUp', 'npu', 'AK8Puppijet0_pt', 'AK4Puppijet2_dR08', 'AK8Puppijet1_phi', 'AK4Puppijet0_deepcsvb', 'AK8Puppijet0_deepdoublec', 'AK4Puppijet0_deepcsvbb', 'AK4Puppijet2_pt', 'AK8Puppijet0_pt_JERDown', 'AK8Puppijet0_pt_JESUp', 'AK4Puppijet1_pt', 'vmuoLoose0_phi', 'AK8Puppijet0_isTightVJet', 'pfmet', 'MetXCorrjerUp', 'ntau', 'pfmetphi', 'AK8Puppijet1_e3_v1_sdb1', 'genVMass', 'AK8Puppijet0_eta', 'AK8Puppijet1_msd', 'AK4Puppijet0_dPhi08', 'AK8Puppijet0_N2sdb1', 'MetYCorrjerDown', 'AK4Puppijet3_pt', 'AK4Puppijet2_deepcsvbb', 'vmuoLoose0_eta', 'nAK4PuppijetsPt30', 'AK8Puppijet0_deepdoublecvb'}
+allcolumns = {'MetYCorrjesDown', 'neleLoose', 'AK4Puppijet1_dR08', 'AK4Puppijet1_dPhi08', 'AK8Puppijet0_msd', 'genVPt', 'AK4Puppijet2_deepcsvb', 'AK8Puppijet0_phi', 'AK8Puppijet1_tau32', 'MetXCorrjesUp', 'AK4Puppijet1_deepcsvb', 'MetYCorrjesUp', 'AK8Puppijet0_deepdoubleb', 'AK8Puppijet1_e4_v2_sdb1', 'vmuoLoose0_pt', 'AK8Puppijet0_pt_JESDown', 'AK4Puppijet1_deepcsvbb', 'AK4Puppijet0_dR08', 'nmuLoose', 'scale1fb', 'AK8Puppijet0_isHadronicV', 'AK4Puppijet3_dR08', 'MetXCorrjerDown', 'AK4Puppijet3_dPhi08', 'AK4Puppijet3_deepcsvb', 'MetXCorrjesDown', 'AK4Puppijet2_dPhi08', 'genVPhi', 'AK4Puppijet0_pt', 'AK4Puppijet3_deepcsvbb', 'runNum', 'MetYCorrjerUp', 'AK8Puppijet0_pt_JERUp', 'npu', 'AK8Puppijet0_pt', 'AK4Puppijet2_dR08', 'AK8Puppijet1_phi', 'AK4Puppijet0_deepcsvb', 'AK8Puppijet0_deepdoublec', 'AK4Puppijet0_deepcsvbb', 'AK4Puppijet2_pt', 'AK8Puppijet0_pt_JERDown', 'AK8Puppijet0_pt_JESUp', 'AK4Puppijet1_pt', 'vmuoLoose0_phi', 'AK8Puppijet0_isTightVJet', 'pfmet', 'MetXCorrjerUp', 'ntau', 'pfmetphi', 'AK8Puppijet1_e3_v1_sdb1', 'genVMass', 'AK8Puppijet0_eta', 'AK8Puppijet1_msd', 'AK4Puppijet0_dPhi08', 'AK8Puppijet0_N2sdb1', 'MetYCorrjerDown', 'AK4Puppijet3_pt', 'AK4Puppijet2_deepcsvbb', 'vmuoLoose0_eta', 'nAK4PuppijetsPt30', 'AK8Puppijet0_deepdoublecvb', 'triggerBits', 'passJson'}
 
+spark.sparkContext.addFile("boostedHbbProcessor.py")
 from boostedHbbProcessor import BoostedHbbProcessor
 hbb = BoostedHbbProcessor(corrections=corrections,
                           columns=allcolumns,

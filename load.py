@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 from pymongo import MongoClient
 from urllib.parse import quote_plus
 from bson import Binary
@@ -22,6 +23,8 @@ def unpack(col):
 
 def load(db, collection='test'):
     db[collection].drop()
+    # newer mongo has: access_pattern_hint=sequential as well
+    db.create_collection(collection, storageEngine={'wiredTiger': {'configString': 'block_compressor=none'}})
 
     with open('samplefiles.json') as fin:
         samplesets = json.load(fin)
@@ -56,4 +59,4 @@ uri = 'mongodb://%s:%s@%s/%s.%s' % (quote_plus(config['mongo']['user']),
 client = MongoClient(uri)
 db = client[config['mongo']['database']]
 
-# load(db, config['mongo']['collection'])
+load(db, config['mongo']['collection'])

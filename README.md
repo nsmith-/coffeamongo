@@ -12,15 +12,16 @@ pip install --upgrade pip setuptools
 pip install -r requirements.txt
 ```
 
-## Start a server
+## Setup server
+Start daemon
 ```
 mongod --dbpath data --bind_ip 127.0.0.1
 ```
-
-## Start a client, make users
+Create user, provide necessary roles
 ```
 mongo
 > use admin
 > db.createUser({user:'coffea', pwd: 'password', roles:[{db:'coffeadb', role:'readWrite'}]})
-> db.auth('coffea', 'password')
+> db.createRole({"role" : "splitVector", "roles" : [], "privileges" : [{"resource" : {"db" : "coffeadb", "collection" : ""}, "actions" : ["splitVector"]}]})
+> db.grantRolesToUser('coffea', [{role:'splitVector', db:'coffeadb'}])
 ```
