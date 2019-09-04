@@ -1,0 +1,15 @@
+pymongo
+pyspark
+pyarrow
+ipython
+blosc
+numba
+uproot
+pandas
+matplotlib
+scipy
+tqdm
+cloudpickle
+jinja2
+lz4
+coffea
