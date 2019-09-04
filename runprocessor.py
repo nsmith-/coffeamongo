@@ -9,6 +9,7 @@ import pandas as pd
 from pyspark.sql import SparkSession
 from functools import partial
 from coffea import processor, util
+import configparser
 
 
 def unpack(col):
@@ -68,15 +69,24 @@ def build_pipeline(columns):
     return pipeline
 
 
+config = configparser.ConfigParser()
+config.read('config.ini')
+uri = 'mongodb://%s:%s@%s/%s.%s' % (quote_plus(config['mongo']['user']),
+                                    quote_plus(config['mongo']['password']),
+                                    config['mongo']['host'],
+                                    config['mongo']['database'],
+                                    config['mongo']['collection'],
+                                    )
+
 spark = (SparkSession.builder
-         .master("local[1]")
-         .appName("myApp")
+         .master(config['spark']['master'])
+         .appName("mongo")
          .config('spark.sql.execution.arrow.enabled','true')
          .config('spark.sql.execution.arrow.fallback.enabled','false')
          .config('spark.sql.execution.arrow.maxRecordsPerBatch', 200000)
          .config("spark.jars.packages", "org.mongodb.spark:mongo-spark-connector_2.11:2.4.1")
-         .config("spark.mongodb.input.uri", "mongodb://127.0.0.1/coffeadb.test")
-         .config("spark.mongodb.output.uri", "mongodb://127.0.0.1/coffeadb.test")
+         .config("spark.mongodb.input.uri", uri)
+         .config("spark.mongodb.output.uri", uri)
          .getOrCreate()
          )
 

@@ -1,8 +1,12 @@
 from pymongo import MongoClient
+from urllib.parse import quote_plus
 from bson import Binary
 import blosc
 import numpy as np
 import uproot
+import json
+from tqdm import tqdm
+import configparser
 
 def pack(a):
     # assume a.shape = (n,)
@@ -16,41 +20,40 @@ def unpack(col):
     return a
 
 
-def load(db):
-    db.test.drop()
+def load(db, collection='test'):
+    db[collection].drop()
 
-    inputs = {
-        'GluGluHToBB_M125_LHEHpT_250_Inf_13TeV_amcatnloFXFX_pythia8': [
-            '/Users/ncsmith/src/coffeandbacon/analysis/data/GluGluHToBB_M125_LHEHpT_250_Inf_13TeV_amcatnloFXFX_pythia8.Output_job0_job0_file0to59.root',
-        ],
-        'GluGluHToCC_M125_LHEHpT_250_Inf_13TeV_amcatnloFXFX_pythia8': [
-            '/Users/ncsmith/src/coffeandbacon/analysis/data/GluGluHToCC_M125_LHEHpT_250_Inf_13TeV_amcatnloFXFX_pythia8.Output_job15_job15_file900to959.root',
-        ],
-        'TTToHadronic_TuneCP5_13TeV_powheg_pythia8': [
-            '/Users/ncsmith/src/coffeandbacon/analysis/data/TTToHadronic_TuneCP5_13TeV_powheg_pythia8.Output_job101_job101_file4040to4079.root',
-        ],
-        'QCD_HT700to1000_TuneCP5_13TeV-madgraphMLM-pythia8': [
-            '/Users/ncsmith/src/coffeandbacon/analysis/data/QCD_HT700to1000_TuneCP5_13TeV-madgraphMLM-pythia8.Output_job116_job116_file1160to1169.root',
-        ],
-    }
+    with open('samplefiles.json') as fin:
+        samplesets = json.load(fin)
+
+    inputs = samplesets['test_skim']
 
     for dataset, files in inputs.items():
-        for chunkindex, chunk in enumerate(uproot.iterate(files, 'Events', entrysteps=500000, namedecode='ascii')):
+        for chunkindex, chunk in tqdm(enumerate(uproot.iterate(files, 'otree', entrysteps=500000, namedecode='ascii')), desc=dataset, unit='chunk'):
             for column, data in chunk.items():
                 if not isinstance(data, np.ndarray) or len(data.shape) != 1:
-                    print("Skpping column %s in chunk %d of %s" % (column, chunkindex, dataset))
+                    print("Skipping column %s in chunk %d of %s" % (column, chunkindex, dataset))
                 record = {
                     'dataset': dataset,
                     'chunkindex': chunkindex,
                     'column': column,
                     'data': pack(data),
                 }
-                res = db.test.insert_one(record)
+                res = db[collection].insert_one(record)
                 if not res.acknowledged:
                     raise RuntimeError("Failed to write column %s in chunk %d of %s" % (column, chunkindex, dataset))
+                # print("Wrote column %s in chunk %d of %s" % (column, chunkindex, dataset))
 
 
-client = MongoClient('localhost:27017')
-db = client.coffeadb
+config = configparser.ConfigParser()
+config.read('config.ini')
+uri = 'mongodb://%s:%s@%s/%s.%s' % (quote_plus(config['mongo']['user']),
+                                    quote_plus(config['mongo']['password']),
+                                    config['mongo']['host'],
+                                    config['mongo']['database'],
+                                    config['mongo']['collection'],
+                                    )
+client = MongoClient(uri)
+db = client[config['mongo']['database']]
 
-load(db)
+# load(db, config['mongo']['collection'])
