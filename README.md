@@ -6,7 +6,7 @@ conda activate mongo
 ```
 venv:
 ```
-python3 -m venv mongo36
+python3 -m venv --system-site-packages mongo36
 source mongo36/bin/activate
 pip install --upgrade pip setuptools
 pip install -r requirements.txt
